@@ -1,0 +1,58 @@
+
+name: Build Yandang Translator APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Find and extract Android project
+        run: |
+          ARCHIVE=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          if [ -z "$ARCHIVE" ]; then
+            echo "Project ZIP not found"
+            exit 1
+          fi
+          mkdir extracted
+          unzip -q "$ARCHIVE" -d extracted
+          PROJECT=$(find extracted -name settings.gradle.kts -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT" ]; then
+            echo "Android project files not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: gradle -p "$PROJECT_DIR" assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yandang-Translator-APK
+          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          
